@@ -82,18 +82,25 @@ function connectWebSocket() {
       console.log("📤 Wysłano init payload:", initPayload);
     });
 
-    // Heartbeat co 5 minut
+    // Wyślij pierwszy ping od razu po połączeniu
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send("ping");
+      lastPongTime = Date.now();
+      console.log("💓 Ping wysłany (start)");
+    }
+
+    // Heartbeat co 15s
     heartbeatInterval = setInterval(() => {
       if (ws.readyState === WebSocket.OPEN) {
         ws.send("ping");
         console.log("💓 Ping wysłany");
       }
-    }, 5 * 60 * 1000);
+    }, 15000);
 
-    // Watchdog co 10s – czeka max 30s na pong
+    // Watchdog co 10s – czeka max 45s na pong
     connectionWatchdog = setInterval(() => {
       const now = Date.now();
-      if (now - lastPongTime > 30000) {
+      if (now - lastPongTime > 45000) {
         console.warn("⛔ Brak pong > 30s. Resetuję połączenie...");
         ws.close(); // To uruchomi reconnect
       }
