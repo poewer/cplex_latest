@@ -44,6 +44,16 @@ chrome.runtime.onStartup.addListener(() => {
   });
 });
 
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (
+    changeInfo.status === 'complete' &&
+    tab.url &&
+    tab.url.startsWith('https://h5.coinplex.ai/quantify')
+  ) {
+    injectScript(tabId);
+  }
+});
+
 
 
 // content.js jest wstrzykiwany automatycznie przez manifest
