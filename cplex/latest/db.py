@@ -47,3 +47,17 @@ def get_all_uuids() -> list:
     except Exception as e:
         print(f"❌ Błąd pobierania UUIDów: {e}")
         return []
+
+
+def get_client(uuid: str) -> dict:
+    """Return full client row for the given uuid."""
+    try:
+        response = supabase.table("clients").select("*").eq("uuid", uuid).limit(1).execute()
+        if response.data:
+            return response.data[0]
+        else:
+            print(f"⚠️ Nie znaleziono klienta: {uuid}")
+            return {}
+    except Exception as e:
+        print(f"❌ Błąd pobierania klienta {uuid}: {e}")
+        return {}

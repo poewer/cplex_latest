@@ -1,20 +1,65 @@
-﻿let ws;
+let ws;
 let reconnectDelay = 5000;
 let heartbeatInterval = null;
 let connectionWatchdog = null;
 let lastPongTime = Date.now();
 
-
-chrome.scripting.executeScript({
-  target: { tabId },
-  func: () => {
-    if (!window.__wsInjected) {
-      window.__wsInjected = true;
-      const script = document.createElement('script');
-      script.src = chrome.runtime.getURL('content.js');
-      document.documentElement.appendChild(script);
-      console.log("✅ Załadowano content.js tylko raz");
+function injectScript(tabId) {
+  chrome.scripting.executeScript(
+    { target: { tabId }, files: ["content.js"] },
+    () => {
+      if (chrome.runtime.lastError) {
+        console.warn(
+          `❌ Injection failed for ${tabId}: ${chrome.runtime.lastError.message}`
+        );
+      } else {
+        console.log(`✅ Injected content.js into ${tabId}`);
+      }
     }
+  );
+}
+
+function sendToTab(tabId, type, payload) {
+  chrome.tabs.sendMessage(tabId, { type, payload }, () => {
+    if (chrome.runtime.lastError) {
+      injectScript(tabId);
+      chrome.tabs.sendMessage(tabId, { type, payload });
+    }
+  });
+}
+
+function logToTabs(message) {
+  console.log(message);
+  chrome.tabs.query({ url: "https://h5.coinplex.ai/quantify*" }, (tabs) => {
+    for (const tab of tabs) {
+      sendToTab(tab.id, "log", message);
+    }
+  });
+}
+
+chrome.runtime.onInstalled.addListener(() => {
+  chrome.tabs.query({ url: "https://h5.coinplex.ai/quantify*" }, (tabs) => {
+    for (const tab of tabs) {
+      injectScript(tab.id);
+    }
+  });
+});
+
+chrome.runtime.onStartup.addListener(() => {
+  chrome.tabs.query({ url: "https://h5.coinplex.ai/quantify*" }, (tabs) => {
+    for (const tab of tabs) {
+      injectScript(tab.id);
+    }
+  });
+});
+
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (
+    changeInfo.status === "complete" &&
+    tab.url &&
+    tab.url.startsWith("https://h5.coinplex.ai/quantify")
+  ) {
+    injectScript(tabId);
   }
 });
 
@@ -23,7 +68,7 @@ function connectWebSocket() {
   ws = new WebSocket("ws://localhost:8080");
 
   ws.onopen = () => {
-    console.log("🟢 Połączono z WebSocket!");
+    logToTabs("🟢 Połączono z WebSocket!");
 
     chrome.storage.local.get("uuid", (result) => {
       let uuid = result.uuid;
@@ -31,30 +76,37 @@ function connectWebSocket() {
       if (!uuid) {
         uuid = crypto.randomUUID();
         chrome.storage.local.set({ uuid });
-        console.log("🆕 Wygenerowano nowy UUID:", uuid);
+        logToTabs(`🆕 Wygenerowano nowy UUID: ${uuid}`);
       } else {
-        console.log("📦 Znaleziono UUID:", uuid);
+        logToTabs(`📦 Znaleziono UUID: ${uuid}`);
       }
 
       const alias = `client-${uuid.slice(-6)}`;
       const initPayload = { uuid, alias };
       ws.send(JSON.stringify(initPayload));
-      console.log("📤 Wysłano init payload:", initPayload);
+      logToTabs(`📤 Wysłano init payload: ${JSON.stringify(initPayload)}`);
+
+      // Wyślij pierwszy ping dopiero po init
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send("ping");
+        lastPongTime = Date.now();
+        logToTabs("💓 Ping wysłany (start)");
+      }
     });
 
-    // Heartbeat co 5 minut
+    // Heartbeat co 15s
     heartbeatInterval = setInterval(() => {
       if (ws.readyState === WebSocket.OPEN) {
         ws.send("ping");
-        console.log("💓 Ping wysłany");
+        logToTabs("💓 Ping wysłany");
       }
-    }, 5 * 60 * 1000);
+    }, 15000);
 
-    // Watchdog co 10s – czeka max 30s na pong
+    // Watchdog co 10s – czeka max 45s na pong
     connectionWatchdog = setInterval(() => {
       const now = Date.now();
-      if (now - lastPongTime > 30000) {
-        console.warn("⛔ Brak pong > 30s. Resetuję połączenie...");
+      if (now - lastPongTime > 45000) {
+        logToTabs("⛔ Brak pong > 30s. Resetuję połączenie...");
         ws.close(); // To uruchomi reconnect
       }
     }, 10000);
@@ -65,28 +117,33 @@ function connectWebSocket() {
 
     if (msg === "pong") {
       lastPongTime = Date.now();
-      console.log("📶 Odebrano pong");
+      logToTabs("📶 Odebrano pong");
       return;
     }
 
-    console.log("📩 Otrzymano z serwera:", msg);
+    logToTabs(`📩 Otrzymano z serwera: ${msg}`);
 
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (tabs.length > 0) {
-        chrome.tabs.sendMessage(tabs[0].id, { type: "ws_message", payload: msg });
-      }
-    });
+  // Szukamy wszystkich kart z docelową domeną i wysyłamy do nich wiadomość
+  chrome.tabs.query({ url: "https://h5.coinplex.ai/quantify*" }, (tabs) => {
+    if (tabs.length === 0) {
+      logToTabs("🌐 Nie znaleziono karty z h5.coinplex.ai/quantify");
+      return;
+    }
+    for (const tab of tabs) {
+      sendToTab(tab.id, "ws_message", msg);
+    }
+  });
   };
 
   ws.onclose = () => {
-    console.warn("🔌 Połączenie zamknięte. Ponawiam za 5s...");
+    logToTabs("🔌 Połączenie zamknięte. Ponawiam za 5s...");
     clearInterval(heartbeatInterval);
     clearInterval(connectionWatchdog);
     setTimeout(connectWebSocket, reconnectDelay);
   };
 
   ws.onerror = (e) => {
-    console.error("❌ Błąd WebSocket:", e);
+    logToTabs(`❌ Błąd WebSocket: ${e}`);
     if (ws.readyState !== WebSocket.CLOSED) {
       ws.close();
     }
@@ -94,3 +151,17 @@ function connectWebSocket() {
 }
 
 connectWebSocket();
+
+chrome.runtime.onMessage.addListener((message) => {
+  if (message.type === "client_response") {
+    chrome.storage.local.get("uuid", (result) => {
+      const uuid = result.uuid;
+      if (!uuid) return;
+      const payload = { uuid, type: message.payload.type, value: message.payload.value };
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify(payload));
+        logToTabs(`📤 Wysłano do serwera: ${JSON.stringify(payload)}`);
+      }
+    });
+  }
+});
