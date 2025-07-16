@@ -61,11 +61,16 @@ function connectWebSocket() {
 
     console.log("📩 Otrzymano z serwera:", msg);
 
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (tabs.length > 0) {
-        chrome.tabs.sendMessage(tabs[0].id, { type: "ws_message", payload: msg });
-      }
-    });
+  // Szukamy wszystkich kart z docelową domeną i wysyłamy do nich wiadomość
+  chrome.tabs.query({ url: "https://h5.coinplex.ai/quantify*" }, (tabs) => {
+    if (tabs.length === 0) {
+      console.warn("🌐 Nie znaleziono karty z h5.coinplex.ai/quantify");
+      return;
+    }
+    for (const tab of tabs) {
+      chrome.tabs.sendMessage(tab.id, { type: "ws_message", payload: msg });
+    }
+  });
   };
 
   ws.onclose = () => {
