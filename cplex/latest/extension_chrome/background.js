@@ -4,27 +4,8 @@ let heartbeatInterval = null;
 let connectionWatchdog = null;
 let lastPongTime = Date.now();
 
-function injectScript(tabId) {
-  chrome.scripting.executeScript(
-    { target: { tabId }, files: ["content.js"] },
-    () => {
-      if (chrome.runtime.lastError) {
-        const msg = `❌ Injection failed for ${tabId}: ${chrome.runtime.lastError.message}`;
-        logToTabs(msg);
-      } else {
-        logToTabs(`✅ Injected content.js into ${tabId}`);
-      }
-    }
-  );
-}
-
 function sendToTab(tabId, type, payload) {
-  chrome.tabs
-    .sendMessage(tabId, { type, payload })
-    .catch(() => {
-      injectScript(tabId);
-      chrome.tabs.sendMessage(tabId, { type, payload });
-    });
+  chrome.tabs.sendMessage(tabId, { type, payload });
 }
 
 function logToTabs(message) {
@@ -35,34 +16,6 @@ function logToTabs(message) {
     }
   });
 }
-
-chrome.runtime.onInstalled.addListener(() => {
-  chrome.tabs.query({ url: "https://h5.coinplex.ai/quantify*" }, (tabs) => {
-    for (const tab of tabs) {
-      injectScript(tab.id);
-    }
-  });
-});
-
-chrome.runtime.onStartup.addListener(() => {
-  chrome.tabs.query({ url: "https://h5.coinplex.ai/quantify*" }, (tabs) => {
-    for (const tab of tabs) {
-      injectScript(tab.id);
-    }
-  });
-});
-
-chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-  if (
-    changeInfo.status === 'complete' &&
-    tab.url &&
-    tab.url.startsWith('https://h5.coinplex.ai/quantify')
-  ) {
-    injectScript(tabId);
-  }
-});
-
-
 
 // content.js jest wstrzykiwany automatycznie przez manifest
 
