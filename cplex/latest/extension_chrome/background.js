@@ -6,15 +6,7 @@ let lastPongTime = Date.now();
 
 
 
-// Wstrzykujemy content.js dopiero gdy docelowa strona się załaduje
-chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-  if (changeInfo.status === 'complete' && tab.url && tab.url.includes('h5.coinplex.ai/quantify')) {
-    chrome.scripting.executeScript({
-      target: { tabId },
-      files: ['content.js']
-    }, () => console.log('✅ Wstrzyknięto content.js na stronę'));
-  }
-});
+// content.js jest wstrzykiwany automatycznie przez manifest
 
 
 function connectWebSocket() {
