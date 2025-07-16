@@ -5,6 +5,7 @@
     return;
   }
   window.__cplexLoaded = true;
+  console.log('🚀 content.js initialized');
 
   const MESSAGE_TYPES = {
     CLICK: "click",
@@ -46,6 +47,7 @@
   }
 
   function sendResponse(type, value) {
+    console.log('📤 sending response', { type, value });
     chrome.runtime.sendMessage({
       type: "client_response",
       payload: { type, value }
@@ -98,6 +100,8 @@
       } catch (e) {
         console.warn("Nieprawidłowa wiadomość z WebSocket:", message.payload);
       }
+    } else if (message.type === "log") {
+      console.log(message.payload);
     }
   });
 
