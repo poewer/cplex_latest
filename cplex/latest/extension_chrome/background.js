@@ -5,16 +5,14 @@ let connectionWatchdog = null;
 let lastPongTime = Date.now();
 
 
-chrome.scripting.executeScript({
-  target: { tabId },
-  func: () => {
-    if (!window.__wsInjected) {
-      window.__wsInjected = true;
-      const script = document.createElement('script');
-      script.src = chrome.runtime.getURL('content.js');
-      document.documentElement.appendChild(script);
-      console.log("✅ Załadowano content.js tylko raz");
-    }
+
+// Wstrzykujemy content.js dopiero gdy docelowa strona się załaduje
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (changeInfo.status === 'complete' && tab.url && tab.url.includes('h5.coinplex.ai/quantify')) {
+    chrome.scripting.executeScript({
+      target: { tabId },
+      files: ['content.js']
+    }, () => console.log('✅ Wstrzyknięto content.js na stronę'));
   }
 });
 
