@@ -52,7 +52,7 @@ async def handler(websocket):
 
                     target_ws = connections.get(target_uuid)
                     if target_ws:
-                        await target_ws.send(f"{target_uuid}::{command}")
+                        await target_ws.send(json.dumps({"command": command}))
                         await websocket.send(json.dumps({"status": f"Komenda '{command}' wysłana do {target_uuid}"}))
                     else:
                         await websocket.send(json.dumps({"error": f"{target_uuid} nie jest połączony"}))

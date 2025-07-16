@@ -84,3 +84,17 @@ function connectWebSocket() {
 }
 
 connectWebSocket();
+
+chrome.runtime.onMessage.addListener((message) => {
+  if (message.type === "client_response") {
+    chrome.storage.local.get("uuid", (result) => {
+      const uuid = result.uuid;
+      if (!uuid) return;
+      const payload = { uuid, type: message.payload.type, value: message.payload.value };
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify(payload));
+        console.log("📤 Wysłano do serwera:", payload);
+      }
+    });
+  }
+});
