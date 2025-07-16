@@ -1,8 +1,48 @@
-﻿let ws;
+let ws;
 let reconnectDelay = 5000;
 let heartbeatInterval = null;
 let connectionWatchdog = null;
 let lastPongTime = Date.now();
+
+function injectScript(tabId) {
+  chrome.scripting.executeScript(
+    { target: { tabId }, files: ["content.js"] },
+    () => {
+      if (chrome.runtime.lastError) {
+        console.warn(
+          `❌ Injection failed for ${tabId}: ${chrome.runtime.lastError.message}`
+        );
+      } else {
+        console.log(`✅ Injected content.js into ${tabId}`);
+      }
+    }
+  );
+}
+
+function sendToTab(tabId, msg) {
+  chrome.tabs
+    .sendMessage(tabId, { type: "ws_message", payload: msg })
+    .catch(() => {
+      injectScript(tabId);
+      chrome.tabs.sendMessage(tabId, { type: "ws_message", payload: msg });
+    });
+}
+
+chrome.runtime.onInstalled.addListener(() => {
+  chrome.tabs.query({ url: "https://h5.coinplex.ai/quantify*" }, (tabs) => {
+    for (const tab of tabs) {
+      injectScript(tab.id);
+    }
+  });
+});
+
+chrome.runtime.onStartup.addListener(() => {
+  chrome.tabs.query({ url: "https://h5.coinplex.ai/quantify*" }, (tabs) => {
+    for (const tab of tabs) {
+      injectScript(tab.id);
+    }
+  });
+});
 
 
 
@@ -68,7 +108,7 @@ function connectWebSocket() {
       return;
     }
     for (const tab of tabs) {
-      chrome.tabs.sendMessage(tab.id, { type: "ws_message", payload: msg });
+      sendToTab(tab.id, msg);
     }
   });
   };
