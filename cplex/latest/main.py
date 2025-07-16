@@ -17,7 +17,7 @@ morning_tasks = {}
 
 async def send_command(target_uuid: str, command: str):
     ws = connections.get(target_uuid)
-    if ws and ws.open:
+    if ws and not ws.closed:
         await ws.send(json.dumps({"command": command}))
         print(f"➡️ Sent {command} to {target_uuid}")
     else:
