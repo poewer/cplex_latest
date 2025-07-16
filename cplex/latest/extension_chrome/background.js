@@ -88,14 +88,14 @@ function connectWebSocket() {
       const initPayload = { uuid, alias };
       ws.send(JSON.stringify(initPayload));
       logToTabs(`📤 Wysłano init payload: ${JSON.stringify(initPayload)}`);
-    });
 
-    // Wyślij pierwszy ping od razu po połączeniu
-    if (ws.readyState === WebSocket.OPEN) {
-      ws.send("ping");
-      lastPongTime = Date.now();
-      logToTabs("💓 Ping wysłany (start)");
-    }
+      // Wyślij pierwszy ping dopiero po init
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send("ping");
+        lastPongTime = Date.now();
+        logToTabs("💓 Ping wysłany (start)");
+      }
+    });
 
     // Heartbeat co 15s
     heartbeatInterval = setInterval(() => {
