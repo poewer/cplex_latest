@@ -1,0 +1,9 @@
+class User:
+    def __init__(self, username, password):
+        self.id = id
+        self.uuid = uuid,
+        self.alias = alias,
+        self.is_enabled = is_enabled,
+        self.running = running,
+        self.amount = amount,
+        self.state = button_status,

@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>WebSocket Admin Panel</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    input, button { margin: 5px 0; padding: 8px; }
+    #log { background: #f5f5f5; padding: 10px; height: 200px; overflow-y: auto; border: 1px solid #ccc; }
+    .actions { margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <h2>🔧 WebSocket Admin Panel</h2>
+
+  <label>UUID użytkownika:</label><br>
+  <input type="text" id="uuidInput" placeholder="Wpisz UUID"><br>
+
+  <button id="connectBtn">🔌 Połącz z WebSocket</button>
+
+  <div class="actions">
+    <h3>Wybierz komendę:</h3>
+    <button onclick="sendCommand('refresh')">🔁 refresh</button>
+    <button onclick="sendCommand('click')">🖱️ click</button>
+    <button onclick="sendCommand('amount')">💰 amount</button>
+    <button onclick="sendCommand('check')">🧐 check</button>
+    <button onclick="sendCommand('closepopup')">❌ closepopup</button>
+  </div>
+
+  <h3>Log:</h3>
+  <div id="log"></div>
+
+  <script>
+    let ws;
+
+    function log(msg) {
+      const logDiv = document.getElementById("log");
+      logDiv.innerHTML += msg + "<br>";
+      logDiv.scrollTop = logDiv.scrollHeight;
+    }
+
+    document.getElementById("connectBtn").addEventListener("click", () => {
+      ws = new WebSocket("ws://localhost:8080");
+
+      ws.onopen = () => {
+        log("🟢 Połączono!");
+        const adminInit = {
+          uuid: "admin-" + crypto.randomUUID().slice(0, 8),
+          is_admin: true
+        };
+        ws.send(JSON.stringify(adminInit));
+        log("📤 Wysłano dane admina");
+      };
+
+      ws.onmessage = (event) => {
+        log("📩 Odpowiedź: " + event.data);
+      };
+
+      ws.onclose = () => log("🔌 Połączenie zamknięte.");
+      ws.onerror = (e) => log("❌ Błąd: " + e.message);
+    });
+
+    function sendCommand(command) {
+      const uuid = document.getElementById("uuidInput").value.trim();
+      if (!uuid || !ws || ws.readyState !== WebSocket.OPEN) {
+        alert("Upewnij się, że podano UUID i że połączenie jest aktywne.");
+        return;
+      }
+
+      const payload = { uuid, command };
+      ws.send(JSON.stringify(payload));
+      log("📤 Wysłano komendę: " + JSON.stringify(payload));
+    }
+  </script>
+</body>
+</html>

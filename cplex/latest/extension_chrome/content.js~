@@ -1,0 +1,155 @@
+﻿const MESSAGE_TYPES = {
+  CLICK: "click",
+  CHECK: "check",
+  AMOUNT: "amount",
+  REFRESH: "refresh",
+  CLOSE_POPUP: "closepopup"
+};
+
+const RESPONSE_KEYS = {
+  BUTTON_STATUS: "BUTTON_STATUS",
+  QUANTIFIABLE_AMOUNT: "QUANTIFIABLE_AMOUNT",
+  POPUP_CLOSED: "POPUP_CLOSED"
+};
+
+// 🚫 Funkcja do zamykania popupu
+function closePopupIfExists() {
+  const popup = document.querySelector('.popup-con');
+  const closeButton = document.querySelector('.cross i.van-icon-cross');
+
+  if (popup && closeButton) {
+    console.log("🔍 Znaleziono popup, próbuję zamknąć...");
+    closeButton.click();
+    console.log("✅ Kliknięto przycisk zamykania popupu");
+    return true;
+  } else {
+    console.log("ℹ️ Popup nie znaleziony lub już zamknięty");
+    return false;
+  }
+}
+
+// 🔄 Funkcja do wielokrotnego sprawdzania i zamykania popupu
+function handlePopupOnLoad() {
+  let attempts = 0;
+  const maxAttempts = 20;
+  const interval = 1000;
+  const initialDelay = 5000;
+
+  const checkAndClose = () => {
+    attempts++;
+    console.log(`🔍 Próba ${attempts}/${maxAttempts} zamknięcia popupu...`);
+
+    if (closePopupIfExists()) {
+      console.log("✅ Popup zamknięty pomyślnie!");
+      return;
+    }
+
+    if (attempts < maxAttempts) {
+      setTimeout(checkAndClose, interval);
+    } else {
+      console.log("⏰ Osiągnięto maksymalną liczbę prób zamykania popupu");
+    }
+  };
+
+  setTimeout(checkAndClose, initialDelay);
+}
+
+// ✉️ Wysyłanie odpowiedzi do serwera (opcjonalnie)
+function sendResponse(type, value) {
+  chrome.runtime.sendMessage({
+    type: "client_response",
+    payload: { type, value }
+  });
+}
+
+// ====== Mapa handlerów komend ======
+const handlers = {
+  [MESSAGE_TYPES.CLICK]: () => {
+    const btn = document.querySelector(".start-btn");
+    if (btn && btn.offsetParent !== null) {
+      btn.click();
+      console.log("✅ Kliknięto przycisk .start-btn");
+    } else {
+      console.warn("❌ Przycisk .start-btn niedostępny");
+    }
+  },
+
+  [MESSAGE_TYPES.CHECK]: () => {
+    const btn = document.querySelector(".start-btn");
+    const status = !btn ? "missing" : btn.offsetParent === null ? "hidden" : "visible";
+    sendResponse(RESPONSE_KEYS.BUTTON_STATUS, status);
+    console.log("🧪 Status przycisku:", status);
+  },
+
+  [MESSAGE_TYPES.AMOUNT]: () => {
+    let attempts = 0;
+    const maxAttempts = 10;
+    const interval = 1000;
+
+    const checkAmount = () => {
+      attempts++;
+
+      const nameElem = Array.from(document.querySelectorAll(".item .name"))
+        .find(el => el.textContent.includes("Today's Quantifiable Amount"));
+      const parent = nameElem?.closest(".item");
+      const valueElem = parent?.querySelector(".val");
+      const amountText = valueElem?.textContent.trim() || "UNKNOWN";
+
+      console.log(`🔁 Próba ${attempts}: znaleziono amount:`, amountText);
+
+      if (amountText !== "UNKNOWN" && !amountText.startsWith("0 /")) {
+        sendResponse(RESPONSE_KEYS.QUANTIFIABLE_AMOUNT, amountText);
+      } else if (attempts < maxAttempts) {
+        setTimeout(checkAmount, interval);
+      } else {
+        sendResponse(RESPONSE_KEYS.QUANTIFIABLE_AMOUNT, amountText);
+      }
+    };
+
+    checkAmount();
+  },
+
+  [MESSAGE_TYPES.REFRESH]: () => {
+    console.log("🔄 Odświeżanie strony...");
+    location.reload();
+  },
+
+  [MESSAGE_TYPES.CLOSE_POPUP]: () => {
+    if (closePopupIfExists()) {
+      console.log("✅ Popup zamknięty przez komendę");
+      sendResponse(RESPONSE_KEYS.POPUP_CLOSED, "success");
+    } else {
+      console.log("❌ Nie udało się zamknąć popupu");
+      sendResponse(RESPONSE_KEYS.POPUP_CLOSED, "failed");
+    }
+  }
+};
+
+// 🔌 Odbieranie wiadomości z background.js
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.type === "ws_message") {
+    const msg = message.payload;
+
+    console.log("📨 Otrzymano z background:", msg);
+
+    try {
+      const data = JSON.parse(msg);
+      const command = data.command;
+
+      if (command in handlers) {
+        handlers[command]();
+      } else {
+        console.warn("❓ Nieznana komenda:", command);
+      }
+    } catch (e) {
+      console.warn("⚠️ Nie udało się sparsować wiadomości:", msg);
+    }
+  }
+});
+
+// 🔄 Obsługa popupu przy starcie
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', handlePopupOnLoad);
+} else {
+  handlePopupOnLoad();
+}

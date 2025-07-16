@@ -1,0 +1,32 @@
+﻿{
+  "manifest_version": 3,
+  "name": "WebSocket Test",
+  "version": "1.0",
+  "description": "Test WebSocket connection to localhost:8765",
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://h5.coinplex.ai/quantify*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "host_permissions": [
+    "http://localhost/*",
+    "https://h5.coinplex.ai/*"
+  ],
+  "permissions": [
+    "storage",
+    "scripting"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icon16.png",
+      "48": "icon48.png",
+      "128": "icon128.png"
+    }
+  }
+}
